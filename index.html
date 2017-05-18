@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+<style>
+#i {width:100%;height:100%}
+#ic {width:256px;height:256px;position:absolute}
+body {margin:0}
+#fft {width:512px; height:512px}
+</style>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<script src='https://code.jquery.com/jquery.min.js'></script>
+<script src='https://code.jquery.com/ui/1.12.1/jquery-ui.min.js'></script>
+<script src='js-fourier/js/fourier.js'></script>
+<script>
+$(function () {
+  var cb = $('#bg')[0].getContext('2d');
+  var cf = $('#fg')[0].getContext('2d');
+  var co = $('#fft')[0].getContext('2d');
+
+  var do_fft_stuff = function () {
+    var o = $('#i').offset();
+    cf.clearRect(0, 0, 512, 512);
+    cf.drawImage($('#i')[0], o.left, o.top, $('#ic').width(), $('#ic').height());
+
+    var idb = cb.getImageData(0, 0, 512, 512);
+    var idf = cf.getImageData(0, 0, 512, 512);
+    var ido = co.getImageData(0, 0, 128, 128);
+    var tdb = [], fdb = [];
+    var tdf = [], fdf = [];
+
+    for (var y = 0; y < 128; ++y)
+      for (var x = 0; x < 128; ++x) {
+        tdb.push(idb.data[(x*4 + y*4*512) * 4]);
+        tdf.push(idf.data[(x*4 + y*4*512) * 4]);
+      }
+
+    Fourier.transform(tdb, fdb);
+    Fourier.transform(tdf, fdf);
+    for (var i = 0; i < fdf.length; ++i) {
+      fdf[i].imag *= -1;
+      fdb[i] = fdb[i].times(fdf[i]);
+    }
+
+    tdb = [];
+    Fourier.invert(fdb, tdb);
+
+    var max = 0;
+    for (var i = 0; i < tdb.length; ++i)
+      max = Math.max(tdb[i], max);
+    for (var i = 0; i < tdb.length; ++i) {
+      ido.data[i * 4] =
+      ido.data[i * 4 + 1] =
+      ido.data[i * 4 + 2] = tdb[i] / max * 255 | 0;
+      ido.data[i * 4 + 3] = 255;
+    }
+
+    co.putImageData(ido, 0, 0);
+  };
+
+  $('#ic').draggable({drag: do_fft_stuff})
+          .resizable({resize: do_fft_stuff});
+  $('#i').load(function () {
+    cb.clearRect(0, 0, 512, 512);
+    cb.drawImage($('#i')[0], 128, 128);
+  });
+});
+</script>
+</head>
+<body>
+  <canvas id='bg' width=512 height=512></canvas>
+  <div id='ic' class='ui-widget-content'>
+    <img id='i' src='js-fourier/grace.png'/>
+  </div>
+  <canvas id='fg' width=512 height=512 style='display:none'></canvas>
+  <canvas id='fft' width=128 height=128></canvas>
+</body>
+</html>
